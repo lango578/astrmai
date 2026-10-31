@@ -50,10 +50,18 @@ def load_token() -> str:
 
 
 class Publisher:
-    def __init__(self, token: str) -> None:
+    def __init__(self, token: str, system_trust: bool = False) -> None:
         self.token = token
         self.login = ""
         self.tree = TREE
+        verify = True
+        if system_trust:
+            # 本机代理的 CA 只装进 Windows 系统信任库，而 httpx 默认用 certifi：
+            # 表现就是 curl 通、Python 报 "unable to get local issuer certificate"。
+            # 这里显式换库重试（并在调用处大声打印），而不是放宽校验或跳过证书。
+            import ssl
+
+            verify = ssl.create_default_context()
         self.client = httpx.Client(
             base_url=API,
             headers={
@@ -62,6 +70,7 @@ class Publisher:
                 "X-Client-Version": "astrmai-publish/0.1",
             },
             timeout=60,
+            verify=verify,
         )
 
     def safe(self, text: str) -> str:
@@ -86,17 +95,18 @@ class Publisher:
 
     # ---------- 仓库 ----------
 
-    def ensure_repo(self, name: str, private: bool, description: str) -> dict:
+    def ensure_repo(self, name: str, private: bool, description: str, set_visibility: bool = False) -> dict:
         existing = self.client.get(f"/repos/{self.login}/{name}")
         if existing.status_code == 200:
             info = existing.json()
-            if bool(info.get("private")) != private:
-                self.call(
-                    "PATCH",
-                    f"/repos/{self.login}/{name}",
-                    json_body={"private": private},
-                )
-                info = self.call("GET", f"/repos/{self.login}/{name}")
+            if bool(info.get("private")) == private:
+                return info
+            if set_visibility:
+                self.call("PATCH", f"/repos/{self.login}/{name}", json_body={"private": private})
+                return self.call("GET", f"/repos/{self.login}/{name}")
+            # 已存在的仓库：默认不动可见性。以前这里按"本次调用的默认值"直接 PATCH，
+            # 结果一次普通推送就把公开仓库悄悄改回了私有 —— 可见性只能由 --visibility/--public 显式改
+            print(f"注意：{name} 已存在且是「{'私有' if info.get('private') else '公开'}」，本次不改可见性（要改用 --visibility）。")
             return info
         created = self.call(
             "POST",
@@ -311,8 +321,16 @@ def main() -> int:
     try:
         who = pub.whoami()
     except Exception as exc:  # noqa: BLE001
-        print("token 校验失败:", pub.safe(exc)[:200])
-        return 2
+        text = pub.safe(str(exc))
+        if "CERTIFICATE_VERIFY_FAILED" in text:
+            # 本机代理的 CA 在 Windows 系统库里、不在 certifi 里：换库重试一次，并说清楚
+            print("certifi 验不过（本机代理的 CA 只装在系统信任库里），改用系统信任库重试…")
+            pub = Publisher(token, system_trust=True)
+            pub.tree = WS / "dist" / args.tree
+            who = pub.whoami()
+        else:
+            print("token 校验失败:", text[:200])
+            return 2
     pub.login = who["login"]
     print(f"账号: {who['login']} (id={who['id']})")
     print(f"token 传统 scope: {who['scopes'] or '（fine-grained，无 scope 头）'}")
@@ -331,7 +349,7 @@ def main() -> int:
         return 0
 
     description = "AstrBot 与 MaiBot（麦麦）强行融合成一个进程、一条 QQ 连接：桥接、双向工具联邦、统一市场、许可证链、自建控制台。AGPL-3.0-or-later。"
-    info = pub.ensure_repo(args.name, private=not args.public, description=description)
+    info = pub.ensure_repo(args.name, private=not args.public, description=description, set_visibility=args.public)
     print(f"仓库就绪: {info['full_name']}（{'私有' if info['private'] else '公开'}）{info['html_url']}")
 
     # 提交署名不带任何私人邮箱：用 GitHub 的 noreply 形式，既归属账号又不暴露真实邮箱
