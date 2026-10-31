@@ -1,0 +1,56 @@
+# 本机环境与依赖：绝不上架
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+tools/pythons/
+tools/uv-cache/
+bin/
+cache/
+
+# 两个上游引擎的源码由用户自己取（见 docs/DEPLOY.md），本仓库不重新发布
+vendor/
+MaiBot-main/
+MaiBot-Napcat-Adapter-main/
+*.zip
+
+# 凭据与运行数据：任何一条都不该进 git
+secrets/
+astrmai_state/
+*.credentials.json
+credentials.json
+model_credentials.json
+.env
+data/
+e2e/
+probe/
+dist/
+*.log
+*.db
+*.sqlite3
+astrmai_status.json
+market_live_report.json
+mock_llm_requests.jsonl
+
+# 截图与临时取证产物（图里会带本机路径与 PID）
+*.png
+*.jpg
+*_failure.log
+panel_probe.html
+last_failure.log
+
+# 真实值清单只在本机存在：扫描器读它，但它自己绝不能上架
+tools/privacy_denylist.txt
+
+# 开发过程中散在根目录的取证残留（tail/key/diag 这类文本可能带着会话内容）
+/*.txt
+/*.out
+/*.jsonl
+/ab_catalog*.json
+/ab_req.txt
+
+# 编辑器/系统
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,5 @@
+name = "astrmai_demo"
+version = "0.1.0"
+author = "astrmai"
+description = "astrmai 原生插件示例：一次开发，两个脑子都能调"
+license = "AGPL-3.0-or-later"

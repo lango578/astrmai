@@ -1,0 +1,7 @@
+name: astrmai
+desc: 把麦麦(MaiBot)的群聊人格引擎嵌进 AstrBot 的平台层，单连接双脑子
+version: "0.1.0"
+author: astrmai
+license: AGPL-3.0-or-later  # 合并作品整体按 AGPL-3.0-or-later 分发
+display_name: astrmai
+astrbot_version: ">=4.0.0"

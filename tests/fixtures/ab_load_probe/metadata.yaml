@@ -1,0 +1,5 @@
+name: ab_load_probe
+description: astrmai 运行时加载取证插件（命令 + LLM 工具各一个）
+version: 1.0.0
+author: astrmai
+repo: https://github.com/astrmai/ab_load_probe

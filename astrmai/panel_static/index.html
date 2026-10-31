@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>astrmai 控制台</title>
+    <link rel="stylesheet" href="/astrmai/style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23141419'/%3E%3Crect x='2' y='3' width='4' height='10' fill='%23e0b04a'/%3E%3Crect x='10' y='3' width='4' height='10' fill='%239a86e8'/%3E%3Crect x='7' y='1' width='2' height='14' fill='%2357c7d4'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="astrmai-shell">
+      <header class="masthead">
+        <div class="mark">
+          <span class="lane-a">astr</span><span class="seam-mark">|</span><span class="lane-b">mai</span>
+        </div>
+        <div class="kpis" id="kpi-strip"></div>
+        <div class="lamps" id="lamps"></div>
+      </header>
+
+      <div class="body-grid">
+        <nav class="rail" id="nav" aria-label="功能菜单"></nav>
+        <main id="stage">
+          <p class="boot-note">正在读取负载…</p>
+        </main>
+      </div>
+
+      <footer class="statusline">
+        <span id="status-text">就绪</span>
+        <span class="grow"></span>
+        <span id="clock" class="mono"></span>
+        <button type="button" id="refresh" class="ghost">立即刷新</button>
+        <label class="tick"><input type="checkbox" id="autoscroll" checked /> 自动刷新</label>
+      </footer>
+    </div>
+
+    <script src="/astrmai/app.js"></script>
+  </body>
+</html>
