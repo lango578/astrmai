@@ -13,12 +13,20 @@ runner 是常驻的（不是每次调用起一个进程），所以一个 `httpx
 
 ## 装
 
-1. 把整个 `astrbot_bridge/` 目录放进 `<麦麦>/plugins/`。
-2. 对面（AstrBot 那边）要满足：
+> **目录名必须是 `astrbot_bridge`**：麦麦按插件目录名做 IPC 路由与配置落盘，而这个仓库叫
+> `maibot-plugin-astrbot-bridge`，所以 clone 时要显式指定目标目录名，别直接 clone 进 `plugins/`。
+
+```bash
+git clone https://github.com/lango578/maibot-plugin-astrbot-bridge <麦麦>/plugins/astrbot_bridge
+```
+
+（下载 zip 解压也一样，把最外层目录改名成 `astrbot_bridge`。）
+
+1. 对面（AstrBot 那边）要满足：
    - astrmai 在跑且控制台开着：`ASTRMAI_PANEL=on`；
    - 设了机器 token：`ASTRMAI_PANEL_TOKEN=<一串值>`；
    - **控制台初始口令必须已经改掉** —— 没改之前所有端点都不放行，这个插件也会拿到 403。
-3. 在麦麦的插件配置里填：
+2. 在麦麦的插件配置里填：
 
 | 字段 | 说明 |
 |---|---|
