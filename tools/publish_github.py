@@ -296,8 +296,11 @@ class Publisher:
             problems.append(f"{len(differ)} 个文件字节与本地不一致（sha 不同）：{differ[:5]}")
         if len(remote) != expect_files:
             problems.append(f"远端 {len(remote)} 个文件，期望 {expect_files}")
+        # 探针清单只对"本地树里确实有"的文件生效：插件包没有 docs/COVERAGE.md，
+        # 拿主工程的清单去查它就是误报（刚才就是这样报了两条假 FAIL）
+        local_paths = {f["path"] for f in self.collect()}
         for probe in ("LICENSE", "README.md", "docs/COVERAGE.md", "astrmai/panel.py", "astrmai_plugin/main.py"):
-            if probe not in remote:
+            if probe in local_paths and probe not in remote:
                 problems.append(f"远端缺 {probe}")
         return problems
 
@@ -312,6 +315,7 @@ def main() -> int:
     ap.add_argument("--visibility", choices=["public", "private"], help="只改可见性，不推内容")
     ap.add_argument("--orphan", action="store_true", help="推一条无父提交并强制移动分支（用来覆盖坏历史，需要没有 delete_repo 权限时）")
     ap.add_argument("--git", action="store_true", help="用真 git push（单条提交）；不通则自动退回 Data API")
+    ap.add_argument("--verify-only", action="store_true", help="只核对远端与本地发布树，不推任何东西")
     ap.add_argument("--message", default="astrmai 0.1.0：AstrBot + 麦麦强行融合（含控制台、市场、许可证链、攻击面取证）")
     args = ap.parse_args()
 
@@ -340,6 +344,12 @@ def main() -> int:
     print(f"计划发布: {args.name} / {len(files)} 个文件 / 约 {total * 3 // 4 // 1024} KB（base64 前）")
     print(f"可见性: {'公开' if args.public else '私有'}（默认私有，确认内容后翻公开即可）")
 
+    if args.verify_only:
+        problems = pub.verify(args.name, args.branch, len(pub.collect()))
+        for line in problems:
+            print("  核对 FAIL", line)
+        print("核对通过：远端与本地逐文件 sha 一致" if not problems else f"{len(problems)} 项不一致")
+        return 1 if problems else 0
     if args.visibility:
         info = pub.set_visibility(args.name, args.visibility == "private")
         print(f"已把 {info['full_name']} 设为 {'私有' if info['private'] else '公开'}: {info['html_url']}")
