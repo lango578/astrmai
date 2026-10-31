@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="astrmai">
+  <!--
+    astrmai 专属图标：两条对接的通道 + 一道贯穿的总线。
+    琥珀 = AstrBot 平台层，紫罗兰 = 麦麦（MaiBot），青色 = 融合桥接层（一条循环、一条连接）。
+    两个插头咬进总线，表达"强行融合"不是并排摆放，而是同一条链路上互相调用。
+    硬边、直角、1px 内框：不借用两家上游的任何品牌形，不做圆润吉祥物。
+    与面板 masthead 的 astr|mai、以及 index.html 里的 16px favicon 是同一套几何（按 1/4 比例）。
+  -->
+  <rect width="64" height="64" fill="#141419"/>
+  <rect x="1" y="1" width="62" height="62" fill="none" stroke="#2a2a33" stroke-width="1"/>
+
+  <!-- 左通道（AstrBot），带一个咬进总线的插头 -->
+  <path d="M8 12 H24 V50 H8 Z" fill="#e0b04a"/>
+  <path d="M24 24 H28 V38 H24 Z" fill="#e0b04a"/>
+
+  <!-- 右通道（麦麦），镜像插头 -->
+  <path d="M40 12 H56 V50 H40 Z" fill="#9a86e8"/>
+  <path d="M40 24 H36 V38 H40 Z" fill="#9a86e8"/>
+
+  <!-- 总线：宽 8/64，缩到 16px 还剩 2px，不会糊没 -->
+  <path d="M28 6 H36 V58 H28 Z" fill="#57c7d4"/>
+  <!--
+    两道"调用刻痕"只从两侧咬进来，中间留 2 个单位的桥：
+    全切断开会把它画成三截漂浮碎片（第一版就是这样），留桥才读得出"一条总线 + 两次往返"。
+  -->
+  <path d="M28 18 H31 M33 18 H36 M28 46 H31 M33 46 H36" stroke="#141419" stroke-width="3"/>
+</svg>

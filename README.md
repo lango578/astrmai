@@ -1,5 +1,7 @@
 # astrmai
 
+![astrmai 图标：琥珀（AstrBot）与紫罗兰（麦麦）两条通道各伸出一个插头，被一道青色总线（融合层）强行对接](assets/astrmai-icon.svg)
+
 把 **[AstrBot](https://github.com/AstrBotDevs/AstrBot)**（平台层 / 插件生态 / 命令）和 **[MaiBot 麦麦](https://github.com/MaiM-with-u/MaiBot)**（群聊人格引擎）**强行合进同一个进程**：一个 asyncio 事件循环、一条 NapCat 反向 WebSocket 连接、两个脑子分工应答。
 
 > 现状：**研究可用的 0.1.0**，不是开箱即用的产品。核心链路有 15 项离线测试兜着（含端到端与攻击面取证），但请自己验一遍再接线上群。

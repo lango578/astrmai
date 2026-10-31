@@ -26,6 +26,7 @@ INCLUDE_DIRS = [
     "tests",
     "tools",
     "docs",
+    "assets",
 ]
 INCLUDE_FILES = [
     "run_real.py",
