@@ -57,9 +57,26 @@ WEAK = {
 }
 
 
+def state_dir() -> Path:
+    """凭据与面板设置的家目录。
+
+    市场安装的插件目录会在更新时被整个删掉重建（AstrBot 的 updater 先 rmtree 再 move），
+    所以那种布局下状态必须落在 AstrBot 的 `data/plugin_data/astrmai/`，不能跟着插件包一起被抹掉。
+    仓库/开发布局下仍然是工作区里的 `astrmai_state/`。
+    """
+
+    override = os.environ.get("ASTRMAI_STATE_DIR", "").strip()
+    if override:
+        return Path(override)
+    pkg_root = Path(__file__).resolve().parents[1]
+    if pkg_root.parents[0].name == "plugins":
+        # .../data/plugins/astrmai/astrmai/credentials.py -> .../data/plugin_data/astrmai
+        return pkg_root.parents[1] / "plugin_data" / "astrmai"
+    return pkg_root / "astrmai_state"
+
+
 def credentials_path() -> Path:
-    base = Path(os.environ.get("ASTRMAI_STATE_DIR", str(Path(__file__).resolve().parents[1] / "astrmai_state")))
-    return base / "credentials.json"
+    return state_dir() / "credentials.json"
 
 
 def generate_secret(length: int = 20) -> str:

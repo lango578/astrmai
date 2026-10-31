@@ -598,6 +598,42 @@ def tools_page(star: Any) -> dict:
     )
 
 
+async def tool_call(star: Any, body: dict) -> dict:
+    """执行一个 AstrBot 侧的工具，给外部调用方（麦麦那侧的桥插件）用。
+
+    必须带 target：AstrBot 的处理器是靠**会话事件**找回平台与上下文的。没有这个会话的近期事件
+    就直接拒绝，而不是随便抓一个别人的事件凑数 —— 那是跨会话串权限。
+    """
+
+    from .federation import call_astrbot_tool
+
+    name = str(body.get("name") or "").strip()
+    if not name:
+        return {"ok": False, "reason": "缺 name"}
+    args = body.get("args") if isinstance(body.get("args"), dict) else {}
+    target = str(body.get("target") or "").strip()
+    if not target:
+        return {"ok": False, "reason": "缺 target：这次执行挂在哪个会话上（工具处理器要靠它找回平台连接）"}
+    events = getattr(star, "_event_by_target", {}) or {}
+    event = next((ev for (_kind, tid), ev in events.items() if str(tid) == target), None)
+    if event is None:
+        return {"ok": False, "reason": f"会话 {target} 最近没有消息进来，astrmai 手里没有可复用的事件上下文，不能凭空执行"}
+    ctx = _ctx(star)
+    manager = None
+    if ctx is not None:
+        try:
+            manager = ctx.get_llm_tool_manager()
+        except Exception:  # noqa: BLE001 - 取不到管理器就是没在跑
+            manager = None
+    if manager is None:
+        return {"ok": False, "reason": "AstrBot 工具管理器没在跑"}
+    try:
+        text = await call_astrbot_tool(manager, name, args, event)
+    except Exception as exc:  # noqa: BLE001 - 远端调用方要的是结论，不是堆栈
+        return {"ok": False, "reason": f"{type(exc).__name__}: {str(exc)[:200]}"}
+    return scrub({"ok": True, "name": name, "target": target, "result": str(text)[:4000]})
+
+
 def _license_of(target: Path) -> dict:
     """插件目录的许可证结论（安装时记录，没记录就现读）。"""
 
@@ -716,7 +752,9 @@ def workspace_root() -> Path:
 
 
 def settings_path() -> Path:
-    return Path(os.environ.get("ASTRMAI_STATE_DIR", str(workspace_root() / "astrmai_state"))) / "settings.json"
+    from .credentials import state_dir  # 同一套判据，别在两处各猜一次插件目录布局
+
+    return state_dir() / "settings.json"
 
 
 def load_settings_file() -> dict:

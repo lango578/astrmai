@@ -4,7 +4,7 @@
 
 把 **[AstrBot](https://github.com/AstrBotDevs/AstrBot)**（平台层 / 插件生态 / 命令）和 **[MaiBot 麦麦](https://github.com/MaiM-with-u/MaiBot)**（群聊人格引擎）**强行合进同一个进程**：一个 asyncio 事件循环、一条 NapCat 反向 WebSocket 连接、两个脑子分工应答。
 
-> 现状：**研究可用的 0.1.0**，不是开箱即用的产品。核心链路有 15 项离线测试兜着（含端到端与攻击面取证），但请自己验一遍再接线上群。
+> 现状：**研究可用的 0.1.0**，不是开箱即用的产品。核心链路有 17 项离线测试兜着（含端到端与攻击面取证），但请自己验一遍再接线上群。
 
 ## 它解决什么
 
@@ -48,7 +48,9 @@ ASTRMAI_PANEL=on .venv/bin/python run_real.py --allow <你的QQ号> --account <�
 | 子进程回收（Windows 作业对象，硬杀也连坐） | `astrmai/jobguard.py` |
 | Web 控制台（多级菜单 + 负载首屏 + scrypt 凭据；含平台连接状态、麦麦自主性开关、TLS 上限与记忆库规模、命令镜像清单、加载拒绝留痕、runner 重启留痕） | `astrmai/panel.py`、`astrmai/panel_static/` |
 | AstrBot 功能面：服务提供商（建/改/启停/设默认/连通测试）、人格、对话历史浏览、定时任务 | `astrmai/panel_data.py`、docs/COVERAGE.md |
-| 离线测试套件（15 项，含攻击面取证） | `tests/`、`run_tests.py` |
+| 离线测试套件（17 项，含攻击面取证） | `tests/`、`run_tests.py` |
+| 可提交 AstrBot 官方市场的**插件包**（瘦宿主：不带麦麦、不替你 pip） | `tools/build_plugin.py` → `dist/astrbot-plugin-astrmai/` |
+| 反向衍生品：**麦麦侧插件**，让纯麦麦用户也能调 AstrBot 的插件工具（跨进程 HTTP，不嵌第二套核心） | `maibot_plugins/astrbot_bridge/`、`tests/test_maibot_bridge.py` |
 
 ## 默认就是保守的
 
@@ -62,7 +64,7 @@ ASTRMAI_PANEL=on .venv/bin/python run_real.py --allow <你的QQ号> --account <�
 ## 测试
 
 ```bash
-python run_tests.py      # 15 项离线：把模型指向本地桩，跑完自动还原，不花你的额度
+python run_tests.py      # 17 项离线：把模型指向本地桩，跑完自动还原，不花你的额度
 ```
 
 覆盖：配置切换幂等、子进程回收（**带对照组**）、消息段转换、市场解析与越界删除保护、许可证识别（认不出就标 `unknown`，不猜）、双向联邦与真 RPC 往返、命令镜像、运行时加载、原生插件、面板 API 形状（含 provider/人格/对话/定时任务四块）、凭据与强制改密、攻击面（未认证、CSRF、路径穿越、畸形参数、爆破、明文零落地）、以及真 AstrBot + 假 NapCat 的单连接端到端。

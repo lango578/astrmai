@@ -53,6 +53,7 @@ class Publisher:
     def __init__(self, token: str) -> None:
         self.token = token
         self.login = ""
+        self.tree = TREE
         self.client = httpx.Client(
             base_url=API,
             headers={
@@ -118,13 +119,13 @@ class Publisher:
     # ---------- 内容 ----------
 
     def collect(self) -> list[dict]:
-        if not TREE.exists():
+        if not self.tree.exists():
             sys.exit("发布树不存在：先跑 python tools/pack_release.py")
         out = []
-        for path in sorted(TREE.rglob("*")):
+        for path in sorted(self.tree.rglob("*")):
             if not path.is_file():
                 continue
-            rel = path.relative_to(TREE).as_posix()
+            rel = path.relative_to(self.tree).as_posix()
             data = path.read_bytes()
             out.append({"path": rel, "mode": "100755" if path.suffix == ".sh" else "100644", "bytes": data, "sha": git_blob_sha(data)})
         return out
@@ -240,7 +241,7 @@ class Publisher:
             env["GIT_TERMINAL_PROMPT"] = "0"
             proc = subprocess.run(
                 ["git", *args],
-                cwd=str(TREE),
+                cwd=str(self.tree),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -252,7 +253,7 @@ class Publisher:
                 raise RuntimeError(f"git {' '.join(args[:2])} 失败: {self.safe(proc.stderr)[:220]}")
             return (proc.stdout or "").strip()
 
-        shutil.rmtree(TREE / ".git", ignore_errors=True)
+        shutil.rmtree(self.tree / ".git", ignore_errors=True)
         try:
             run("init", "-b", branch)
             run("config", "user.name", author["name"])
@@ -262,7 +263,7 @@ class Publisher:
             sha = run("rev-parse", "HEAD")
             out = run("push", "--force", f"https://github.com/{self.login}/{name}.git", f"{sha}:refs/heads/{branch}")
         finally:
-            shutil.rmtree(TREE / ".git", ignore_errors=True)  # 别让发布树里留着一个 .git
+            shutil.rmtree(self.tree / ".git", ignore_errors=True)  # 别让发布树里留着一个 .git
         return {"commit": sha, "tree": "", "files": len(self.collect()), "push": out.splitlines()[-1] if out else ""}
 
     def verify(self, name: str, branch: str, expect_files: int) -> list[str]:
@@ -295,6 +296,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="只验权限与计划，不写")
     ap.add_argument("--name", default=DEFAULT_NAME)
+    ap.add_argument("--tree", default="astrmai-0.1.0", help="dist 下要推的目录名（插件包用 astrbot-plugin-astrmai）")
     ap.add_argument("--branch", default="main")
     ap.add_argument("--public", action="store_true", help="建/保留为公开仓库（默认私有）")
     ap.add_argument("--visibility", choices=["public", "private"], help="只改可见性，不推内容")
@@ -305,6 +307,7 @@ def main() -> int:
 
     token = load_token()
     pub = Publisher(token)
+    pub.tree = WS / "dist" / args.tree
     try:
         who = pub.whoami()
     except Exception as exc:  # noqa: BLE001

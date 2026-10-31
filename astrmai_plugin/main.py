@@ -17,13 +17,55 @@ from astrbot.api.star import Context, Star
 from astrbot.core.message.components import At, AtAll, Image, Plain, Reply
 from astrbot.core.star.filter.command import GreedyStr
 
-WORKSPACE = Path(os.environ.get("ASTRMAI_WORKSPACE", Path(__file__).resolve().parents[1]))
-if str(WORKSPACE) not in sys.path:
-    sys.path.insert(0, str(WORKSPACE))
+PLUGIN_DIR = Path(__file__).resolve().parent
+
+
+def _bridge_layout() -> tuple[bool, Path]:
+    """桥接包在哪，取决于两种布局，判一次就好，别在每个调用点各猜。
+
+    市场安装：AstrBot 用 `data.plugins.<名>.main` 这个点号名导入插件，而且只把 AstrBot
+    项目根放进 sys.path（star_manager 不加插件目录），所以 `astrmai/` 必须在插件目录内、
+    走相对导入；导进来后挂成顶层名 `astrmai`，下面十几处 `from astrmai.x import y` 照旧。
+    仓库/靶场：`astrmai/` 在工作区根，走 sys.path。
+    """
+
+    if (PLUGIN_DIR / "astrmai").is_dir():
+        if __package__:
+            from . import astrmai as _pkg  # type: ignore
+
+            sys.modules["astrmai"] = _pkg
+        elif str(PLUGIN_DIR) not in sys.path:
+            sys.path.insert(0, str(PLUGIN_DIR))
+        return True, PLUGIN_DIR
+    workspace = Path(os.environ.get("ASTRMAI_WORKSPACE", PLUGIN_DIR.parent))
+    if str(workspace) not in sys.path:
+        sys.path.insert(0, str(workspace))
+    return False, workspace
+
+
+MARKET_LAYOUT, WORKSPACE = _bridge_layout()
 
 from astrmai.config import AstrmaiConfig  # noqa: E402
+from astrmai.credentials import state_dir  # noqa: E402
 from astrmai.gate import decide  # noqa: E402
 from astrmai.host import MaiBotHost  # noqa: E402
+
+STATE_DIR = state_dir()
+
+
+def _astrbot_root() -> Path:
+    try:
+        import astrbot
+
+        return Path(astrbot.__file__).resolve().parents[1]
+    except Exception:  # noqa: BLE001 - 拿不到就退回工作区，面板会如实报"未知"
+        return WORKSPACE
+
+
+# 市场布局下麦麦不随包走（16MB 上限），所以默认路径指向可写的 plugin_data，而不是插件目录本身
+MAI_ROOT = Path(os.environ.get("ASTRMAI_MAI_ROOT") or (STATE_DIR / "MaiBot" if MARKET_LAYOUT else WORKSPACE / "MaiBot-main"))
+NATIVE_ROOT = Path(os.environ.get("ASTRMAI_NATIVE_PLUGINS") or (STATE_DIR / "astrmai_plugins" if MARKET_LAYOUT else WORKSPACE / "astrmai_plugins"))
+ASTRBOT_ROOT = Path(os.environ.get("ASTRBOT_ROOT") or (_astrbot_root() if MARKET_LAYOUT else WORKSPACE / "vendor" / "AstrBot-master"))
 
 
 def _segments_to_chain(segments: list[dict]) -> MessageChain:
@@ -58,6 +100,9 @@ def _segments_to_chain(segments: list[dict]) -> MessageChain:
 class Main(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
         super().__init__(context, config)
+        # AstrBot 的 Star.__init__ 收下 config 却并不存成 self.config（core/star/base.py），
+        # 不自己留一份的话，_conf_schema.json 上每个框都是装饰 —— 填了没人读。
+        self.config = config or {}
         self.host: MaiBotHost | None = None
         self.booted = False
         self.boot_error: str = ""
@@ -90,17 +135,40 @@ class Main(Star):
             return
         self._task = asyncio.create_task(self._boot(), name="astrmai-boot")
 
+    def _pref(self, key: str, env: str, default: Any = None) -> Any:
+        """取值优先级：环境变量 > AstrBot 面板里的插件配置 > 默认值。
+
+        市场安装的用户只会去面板填 `_conf_schema.json` 那几个框，所以这条链必须真的被运行时读到；
+        测试会改 config 再走一遍启动，验证"填了不等于没填"。
+        """
+
+        raw = (os.environ.get(env) or "").strip()
+        if raw:
+            return raw
+        conf = getattr(self, "config", None)
+        if conf:
+            try:
+                value = conf.get(key)
+            except Exception:  # noqa: BLE001 - 配置对象不是 dict 就当作没配
+                value = None
+            if isinstance(value, str):
+                value = value.strip()
+            if value not in (None, "", []):
+                return value
+        return default
+
     async def _boot(self) -> None:
-        allowed = {s.strip() for s in os.environ.get("ASTRMAI_ALLOWED_USERS", "").split(",") if s.strip()}
-        groups = {s.strip() for s in os.environ.get("ASTRMAI_GROUPS", "").split(",") if s.strip()}
+        mai_root = Path(str(self._pref("mai_root", "ASTRMAI_MAI_ROOT", str(MAI_ROOT))))
+        allowed = {s.strip() for s in str(self._pref("allowed_users", "ASTRMAI_ALLOWED_USERS", "")).split(",") if s.strip()}
+        groups = {s.strip() for s in str(self._pref("groups", "ASTRMAI_GROUPS", "")).split(",") if s.strip()}
         cfg = AstrmaiConfig(
-            mai_root=Path(os.environ.get("ASTRMAI_MAI_ROOT", WORKSPACE / "MaiBot-main")),
-            platform=os.environ.get("ASTRMAI_PLATFORM", "qq"),
-            account_id=os.environ.get("ASTRMAI_ACCOUNT_ID", ""),
+            mai_root=mai_root,
+            platform=str(self._pref("platform", "ASTRMAI_PLATFORM", "qq")),
+            account_id=str(self._pref("account_id", "ASTRMAI_ACCOUNT_ID", "")),
             allowed_users=allowed,
             groups=groups,
-            group_enabled=os.environ.get("ASTRMAI_ALLOW_GROUPS", "0") == "1",
-            private_enabled=os.environ.get("ASTRMAI_ALLOW_PRIVATE", "1") == "1",
+            group_enabled=str(self._pref("allow_groups", "ASTRMAI_ALLOW_GROUPS", "0")).lower() in ("1", "true", "yes", "on"),
+            private_enabled=str(self._pref("allow_private", "ASTRMAI_ALLOW_PRIVATE", "1")).lower() in ("1", "true", "yes", "on"),
         )
         # 面板改过的闸门要能在重启后还在（环境变量显式钉住的字段优先）
         from astrmai.panel_data import apply_stored_to_cfg
@@ -128,13 +196,17 @@ class Main(Star):
     async def _start_panel(self) -> None:
         """按需起 astrmai 自己的控制台；失败只记错，绝不影响两个脑子。"""
 
-        if os.environ.get("ASTRMAI_PANEL", "off").strip().lower() not in ("1", "on", "true", "yes"):
+        enable = str(self._pref("panel_enable", "ASTRMAI_PANEL", "off")).strip().lower()
+        if enable not in ("1", "on", "true", "yes"):
             return
         from astrmai.panel import AstrmaiPanel
 
+        # 值直接传进 start()：写回 os.environ 会让下一次启动被自己写的那条挡住
+        host = str(self._pref("panel_host", "ASTRMAI_PANEL_HOST", "127.0.0.1"))
+        port = str(self._pref("panel_port", "ASTRMAI_PANEL_PORT", "18124"))
         panel = AstrmaiPanel(lambda: self, ledger=self.ledger, logs=self.logring)
         try:
-            await panel.start()
+            await panel.start(host=host, port=int(port))
         except Exception as exc:  # noqa: BLE001
             self.panel_error = f"{type(exc).__name__}: {exc}"
             print(f"[astrmai] 面板启动失败: {self.panel_error}", flush=True)
@@ -176,7 +248,7 @@ class Main(Star):
         try:
             from astrmai.native_plugin import NativeRegistry
 
-            native_root = Path(os.environ.get("ASTRMAI_NATIVE_PLUGINS", WORKSPACE / "astrmai_plugins"))
+            native_root = NATIVE_ROOT
             self.native = NativeRegistry(self)
             summary = self.native.bootstrap_all(native_root)
             self.federation["native"] = summary
@@ -439,11 +511,12 @@ class Main(Star):
         from astrmai.market import Market
 
         if self._market_obj is None:
+            # 市场布局下缓存写进 plugin_data：插件目录本身会在更新时被删掉重建
             self._market_obj = Market(
-                WORKSPACE,
-                astrbot_root=Path(os.environ.get("ASTRBOT_ROOT", WORKSPACE / "vendor" / "AstrBot-master")),
-                maibot_root=Path(os.environ.get("ASTRMAI_MAI_ROOT", WORKSPACE / "MaiBot-main")),
-                native_root=Path(os.environ.get("ASTRMAI_NATIVE_PLUGINS", WORKSPACE / "astrmai_plugins")),
+                STATE_DIR if MARKET_LAYOUT else WORKSPACE,
+                astrbot_root=ASTRBOT_ROOT,
+                maibot_root=MAI_ROOT,
+                native_root=NATIVE_ROOT,
             )
         return self._market_obj
 

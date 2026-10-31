@@ -52,6 +52,7 @@ from .panel_data import (
     scrub,
     sessions_page,
     settings_page,
+    tool_call,
     tools_page,
 )
 
@@ -147,11 +148,17 @@ class AstrmaiPanel:
 
     # ---------------- 生命周期 ----------------
 
-    async def start(self) -> dict:
+    async def start(self, host: str | None = None, port: int | None = None) -> dict:
+        """启动控制台。host/port 由调用方显式传入时优先于环境变量。
+
+        不要拿 os.environ 当参数管道：插件把自己算出的值写回环境变量后，
+        下一次启动它就会被自己写的那条挡住（我们就是这样把"关不掉面板"做出来的）。
+        """
+
         from aiohttp import web
 
-        bind = os.environ.get("ASTRMAI_PANEL_HOST", "127.0.0.1").strip() or "127.0.0.1"
-        port = int(os.environ.get("ASTRMAI_PANEL_PORT", "18124"))
+        bind = str(host if host else os.environ.get("ASTRMAI_PANEL_HOST", "127.0.0.1")).strip() or "127.0.0.1"
+        port = int(port if port else os.environ.get("ASTRMAI_PANEL_PORT", "18124"))
         ssl_context = self._build_tls(bind)
 
         created_password, plain_password = self.credentials.password.bootstrap(
@@ -200,6 +207,7 @@ class AstrmaiPanel:
         app.router.add_get(f"{API_ROOT}/overview", self._overview)
         app.router.add_get(f"{API_ROOT}/load", self._load)
         app.router.add_get(f"{API_ROOT}/tools", self._tools)
+        app.router.add_post(f"{API_ROOT}/tools/call", self._tools_call)
         app.router.add_get(f"{API_ROOT}/plugins", self._plugins)
         app.router.add_get(f"{API_ROOT}/sessions", self._sessions)
         app.router.add_get(f"{API_ROOT}/logs", self._logs)
@@ -507,6 +515,18 @@ class AstrmaiPanel:
 
     async def _tools(self, request: Any) -> Any:
         return _json(tools_page(self.get_star()))
+
+    async def _tools_call(self, request: Any) -> Any:
+        """给外部调用方（麦麦侧的桥插件）执行一个 AstrBot 工具。
+
+        走的是和其它写端点同一道闸：必须已登录/带 token、过 CSRF、改密前不放行。
+        """
+
+        body, denied = await self._body(request)
+        if denied is not None:
+            return denied
+        result = await tool_call(self.get_star(), body)
+        return _json(result, status=200 if result.get("ok") else 400)
 
     async def _plugins(self, request: Any) -> Any:
         return _json(plugins_page(self.get_star()))

@@ -4,6 +4,7 @@ import asyncio
 import atexit
 import os
 import sys
+from pathlib import Path
 from typing import Any, Optional
 
 from .config import AstrmaiConfig
@@ -14,6 +15,15 @@ from .inbound import onebot_to_maim_dict_async
 def prepare_paths(cfg: AstrmaiConfig) -> None:
     """Make MaiBot importable as `src` and forbid its process supervisor."""
 
+    root_path = Path(str(cfg.mai_root))
+    if not (root_path / "src").is_dir():
+        # 市场安装的 astrmai 不打包麦麦（官方市场 zip 上限 16MB），所以这条是最常见的失败，
+        # 必须说清去哪儿拿、放到哪、怎么用环境变量指过去，而不是抛一句 chdir 的 FileNotFoundError
+        raise FileNotFoundError(
+            f"没找到麦麦本体：{root_path} 下没有 src/。"
+            "请先获取 MaiBot v1.3.18（https://github.com/MaiM-with-u/MaiBot）放到该目录，"
+            "或在插件配置里填 mai_root（仓库模式下可用环境变量 ASTRMAI_MAI_ROOT）。"
+        )
     root = str(cfg.mai_root)
     os.chdir(root)
     if root not in sys.path:

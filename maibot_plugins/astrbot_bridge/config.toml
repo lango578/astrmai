@@ -1,0 +1,13 @@
+# astrbot_bridge 默认配置。装好后在麦麦的插件配置页改，不必手改这个文件。
+
+[plugin]
+enabled = true
+config_version = "1.0.0"
+
+[bridge]
+base_url = "http://127.0.0.1:18124/astrmai/api"
+# 对面 AstrBot 那边的 ASTRMAI_PANEL_TOKEN 值。留空 = 调不通（对面会 401），不是"匿名可用"。
+token = ""
+# 默认执行会话（群号/QQ 号）。留空则每次调用必须显式传 target。
+target = ""
+timeout_seconds = 30

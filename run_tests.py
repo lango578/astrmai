@@ -32,6 +32,8 @@ TESTS = (
     "tests/test_market_offline.py",
     "tests/test_licensing.py",
     "tests/test_plugin_bridge.py",
+    "tests/test_plugin_packaging.py",
+    "tests/test_maibot_bridge.py",
     "tests/test_federation.py",
     "tests/test_plugin_tools_mirror.py",
     "tests/test_command_tools.py",

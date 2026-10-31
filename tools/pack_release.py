@@ -23,6 +23,7 @@ INCLUDE_DIRS = [
     "astrmai",
     "astrmai_plugin",
     "astrmai_plugins",
+    "maibot_plugins",
     "tests",
     "tools",
     "docs",
